@@ -1,0 +1,209 @@
+{
+  "name": "Send contracts automatically when CRM deals close",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Send contracts automatically when CRM deals close\n\nThis workflow sends a contract for e-signature via [VisiSign](https://visisign.app) when a deal is marked closed-won in your CRM, then updates the deal status once all parties have signed.\n\n**Who is this for?**\nSales teams and ops teams who want to eliminate manual contract sending after a deal closes.\n\n**How it works**\n1. Your CRM sends a webhook when a deal closes\n2. VisiSign sends the contract to the contact for signing\n3. When all signers complete, a webhook fires\n4. The workflow updates your CRM deal status and notifies your team\n\n**Requirements**\n- [VisiSign account](https://app.visisign.app/signup) with an API key\n- A CRM that supports outgoing webhooks (HubSpot, Pipedrive, Salesforce, etc.)\n- The `n8n-nodes-visisign` community node installed (self-hosted n8n only)\n\n**How to set up**\n1. Install the community node: Settings → Community Nodes → `n8n-nodes-visisign`\n2. Add your VisiSign API key as credentials\n3. Configure your CRM to POST to the webhook URL when deals close\n4. Update the \"Update CRM Deal\" node with your CRM's API endpoint\n5. Activate the workflow",
+        "height": 560,
+        "width": 420,
+        "color": 1
+      },
+      "id": "a1000000-0000-4000-8000-000000000000",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-200, 80]
+    },
+    {
+      "parameters": {
+        "content": "### 1. Trigger\nCRM sends a webhook when a deal is closed-won.\n\nConfigure your CRM to POST deal data including:\n- `contact_name`\n- `contact_email`\n- `deal_name`\n- `contract_url` (link to your PDF)",
+        "height": 200,
+        "width": 260,
+        "color": 7
+      },
+      "id": "a1000000-0000-4000-8000-000000000010",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [260, 140]
+    },
+    {
+      "parameters": {
+        "content": "### 2. Send contract\nVisiSign creates a signature request with the contact's name, email, and the contract PDF.",
+        "height": 140,
+        "width": 260,
+        "color": 7
+      },
+      "id": "a1000000-0000-4000-8000-000000000011",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [540, 140]
+    },
+    {
+      "parameters": {
+        "content": "### 3. Wait for completion\nVisiSign Trigger fires when all signers have completed. The workflow then updates your CRM and notifies the team.",
+        "height": 140,
+        "width": 520,
+        "color": 7
+      },
+      "id": "a1000000-0000-4000-8000-000000000012",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [260, 400]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "deal-closed",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Deal Closed Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [300, 360],
+      "webhookId": "deal-closed"
+    },
+    {
+      "parameters": {
+        "resource": "signatureRequest",
+        "operation": "create",
+        "title": "={{ 'Contract — ' + $json.deal_name }}",
+        "fileUrl": "={{ $json.contract_url }}",
+        "signers": {
+          "signer": [
+            {
+              "name": "={{ $json.contact_name }}",
+              "email": "={{ $json.contact_email }}"
+            }
+          ]
+        },
+        "message": "={{ 'Hi ' + $json.contact_name + ',\\n\\nPlease review and sign the contract for ' + $json.deal_name + '.\\n\\nLet us know if you have any questions.' }}"
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Send Contract via VisiSign",
+      "type": "n8n-nodes-visisign.visiSign",
+      "typeVersion": 1,
+      "position": [560, 360],
+      "credentials": {
+        "visiSignApi": {
+          "id": "1",
+          "name": "VisiSign API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "events": ["signature_request.completed"]
+      },
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "name": "Contract Completed Trigger",
+      "type": "n8n-nodes-visisign.visiSignTrigger",
+      "typeVersion": 1,
+      "position": [300, 560],
+      "webhookId": "visisign-completed",
+      "credentials": {
+        "visiSignApi": {
+          "id": "1",
+          "name": "VisiSign API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.your-crm.com/deals/{{ $json.signature_request.metadata.deal_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $credentials.crmApiKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "contract_signed"
+            },
+            {
+              "name": "signed_at",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0005-4000-8000-000000000005",
+      "name": "Update CRM Deal Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [560, 560]
+    },
+    {
+      "parameters": {
+        "fromEmail": "team@yourcompany.com",
+        "toEmail": "sales-team@yourcompany.com",
+        "subject": "={{ 'Contract signed: ' + $('Contract Completed Trigger').item.json.signature_request.title }}",
+        "emailType": "text",
+        "message": "={{ $('Contract Completed Trigger').item.json.signature_request.title + ' has been fully signed by all parties.' }}"
+      },
+      "id": "a1b2c3d4-0006-4000-8000-000000000006",
+      "name": "Notify Sales Team",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [780, 560]
+    }
+  ],
+  "connections": {
+    "Deal Closed Webhook": {
+      "main": [
+        [
+          {
+            "node": "Send Contract via VisiSign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contract Completed Trigger": {
+      "main": [
+        [
+          {
+            "node": "Update CRM Deal Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update CRM Deal Status": {
+      "main": [
+        [
+          {
+            "node": "Notify Sales Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 2,
+  "updatedAt": "2026-04-20T00:00:00.000Z",
+  "versionId": "1"
+}

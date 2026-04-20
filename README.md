@@ -51,26 +51,81 @@ Start a workflow when a VisiSign event occurs. Automatically registers a webhook
 
 ## Example Workflows
 
-### CRM → Contract
+Import any of these into n8n: **Settings → Import from File**, or paste the JSON into a new workflow.
 
-1. **Trigger:** New deal in HubSpot / Pipedrive
-2. **VisiSign → Create:** Send contract to the contact
-3. **VisiSign Trigger:** Wait for completion
-4. **Action:** Update CRM deal status
+### Send contracts automatically when deals close
 
-### Form → NDA
+CRM deal closes → send contract → wait for signature → update CRM status + notify team.
 
-1. **Trigger:** New Typeform / form submission
-2. **VisiSign → Create:** Send NDA to the submitter
-3. **VisiSign Trigger:** Wait for signature
-4. **Action:** Send confirmation email
+1. **Webhook:** Receives deal-closed event from your CRM
+2. **VisiSign → Create:** Sends contract with deal name and contact info
+3. **VisiSign Trigger:** Fires when all signers complete
+4. **HTTP Request:** Updates CRM deal status to "contract_signed"
 
-### Payment → Agreement
+**[Import workflow JSON](examples/crm-to-contract.json)**
 
-1. **Trigger:** Stripe payment succeeded
-2. **VisiSign → Create:** Send service agreement
-3. **VisiSign Trigger:** Signed
-4. **Action:** Provision account, update database
+<details>
+<summary>Workflow nodes</summary>
+
+- Deal Closed Webhook (from HubSpot, Pipedrive, Salesforce, etc.)
+- VisiSign: Create signature request
+- VisiSign Trigger: signature_request.completed
+- If: Check completion status
+- HTTP Request: Update CRM deal
+- Email: Notify sales team
+
+</details>
+
+### Automatically send NDAs from form submissions
+
+Form submitted → send NDA → wait for signature → email signed copy + notify Slack.
+
+1. **Webhook:** Receives form submission (Typeform, Tally, Webflow, etc.)
+2. **VisiSign → Create:** Sends NDA to the submitter
+3. **VisiSign Trigger:** Fires when signer completes
+4. **VisiSign → Download:** Gets the signed PDF
+5. **Email:** Sends signed copy back to the signer
+
+**[Import workflow JSON](examples/form-to-nda.json)**
+
+<details>
+<summary>Workflow nodes</summary>
+
+- Form Submitted Webhook
+- VisiSign: Create signature request (NDA)
+- Respond to Webhook (confirms submission)
+- VisiSign Trigger: signature_request.signed
+- VisiSign: Download signed file
+- Email: Send confirmation with signed PDF attached
+- HTTP Request: Notify Slack channel
+
+</details>
+
+### Send contracts after payment automatically
+
+Stripe payment → send agreement → wait for signature → provision account + archive PDF.
+
+1. **Webhook:** Receives Stripe checkout.session.completed
+2. **VisiSign → Create:** Sends service agreement to the customer
+3. **VisiSign Trigger:** Fires when agreement is signed
+4. **HTTP Request:** Provisions the customer's account
+5. **Email:** Sends welcome email
+
+**[Import workflow JSON](examples/payment-to-agreement.json)**
+
+<details>
+<summary>Workflow nodes</summary>
+
+- Stripe Payment Webhook
+- If: Verify checkout.session.completed event
+- VisiSign: Create signature request (agreement)
+- VisiSign Trigger: signature_request.completed
+- HTTP Request: Provision account in your app
+- Email: Send welcome email
+- VisiSign: Download signed agreement
+- HTTP Request: Archive PDF to S3
+
+</details>
 
 ## Resources
 
