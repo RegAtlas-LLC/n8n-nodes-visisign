@@ -23,8 +23,8 @@
   "scripts": {
     "build": "tsc && gulp build:icons",
     "dev": "tsc --watch",
-    "lint": "n8n-node-cli lint",
-    "release": "n8n-node-cli release",
+    "lint": "npx @n8n/node-cli lint",
+    "release": "npx @n8n/node-cli release",
     "prepublishOnly": "npm run build"
   },
   "files": [
