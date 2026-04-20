@@ -149,7 +149,7 @@ export class VisiSignTrigger implements INodeType {
 							Authorization: `Bearer ${credentials.apiKey}`,
 						},
 					});
-				} catch (error) {
+				} catch {
 					// Webhook may have already been deleted
 				}
 
