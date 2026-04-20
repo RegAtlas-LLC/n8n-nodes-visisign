@@ -87,12 +87,9 @@ export class VisiSignTrigger implements INodeType {
 				const credentials = await this.getCredentials('visiSignApi');
 				const baseUrl = credentials.baseUrl as string;
 
-				const response = await this.helpers.httpRequest({
+				const response = await this.helpers.httpRequestWithAuthentication.call(this, 'visiSignApi', {
 					method: 'GET' as IHttpRequestMethods,
 					url: `${baseUrl}/v1/webhooks`,
-					headers: {
-						Authorization: `Bearer ${credentials.apiKey}`,
-					},
 					json: true,
 				});
 
@@ -113,13 +110,9 @@ export class VisiSignTrigger implements INodeType {
 				const credentials = await this.getCredentials('visiSignApi');
 				const baseUrl = credentials.baseUrl as string;
 
-				const response = await this.helpers.httpRequest({
+				const response = await this.helpers.httpRequestWithAuthentication.call(this, 'visiSignApi', {
 					method: 'POST' as IHttpRequestMethods,
 					url: `${baseUrl}/v1/webhooks`,
-					headers: {
-						Authorization: `Bearer ${credentials.apiKey}`,
-						'Content-Type': 'application/json',
-					},
 					body: {
 						url: webhookUrl,
 						events: [event],
@@ -142,12 +135,9 @@ export class VisiSignTrigger implements INodeType {
 				const baseUrl = credentials.baseUrl as string;
 
 				try {
-					await this.helpers.httpRequest({
+					await this.helpers.httpRequestWithAuthentication.call(this, 'visiSignApi', {
 						method: 'DELETE' as IHttpRequestMethods,
 						url: `${baseUrl}/v1/webhooks/${webhookId}`,
-						headers: {
-							Authorization: `Bearer ${credentials.apiKey}`,
-						},
 					});
 				} catch {
 					// Webhook may have already been deleted
