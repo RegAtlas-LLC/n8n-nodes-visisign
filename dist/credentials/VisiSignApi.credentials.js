@@ -32,6 +32,13 @@ class VisiSignApi {
                 },
             },
         };
+        this.test = {
+            request: {
+                baseURL: '={{$credentials.baseUrl}}/v1',
+                url: '/templates',
+                method: 'GET',
+            },
+        };
     }
 }
 exports.VisiSignApi = VisiSignApi;
