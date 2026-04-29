@@ -3,55 +3,67 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Send contracts automatically when CRM deals close\n\nThis workflow sends a contract for e-signature via [VisiSign](https://visisign.app) when a deal is marked closed-won in your CRM, then updates the deal status once all parties have signed.\n\n**Who is this for?**\nSales teams and ops teams who want to eliminate manual contract sending after a deal closes.\n\n**How it works**\n1. Your CRM sends a webhook when a deal closes\n2. VisiSign sends the contract to the contact for signing\n3. When all signers complete, a webhook fires\n4. The workflow updates your CRM deal status and notifies your team\n\n**Requirements**\n- [VisiSign account](https://app.visisign.app/signup) with an API key\n- A CRM that supports outgoing webhooks (HubSpot, Pipedrive, Salesforce, etc.)\n- The `n8n-nodes-visisign` community node installed (self-hosted n8n only)\n\n**How to set up**\n1. Install the community node: Settings → Community Nodes → `n8n-nodes-visisign`\n2. Add your VisiSign API key as credentials\n3. Configure your CRM to POST to the webhook URL when deals close\n4. Update the \"Update CRM Deal\" node with your CRM's API endpoint\n5. Activate the workflow",
+        "content": "## Send contracts automatically when CRM deals close\n\nThis workflow sends a VisiSign contract when your CRM posts a closed-won deal to n8n, then handles the VisiSign completion event.\n\n### Tested path\n1. Send the sample deal payload below to the **Deal Closed Webhook** test URL.\n2. Confirm **Send Contract via VisiSign** creates a signature request.\n3. Complete the signature request in VisiSign.\n4. Confirm the **Contract Completed Trigger** receives the completion event and sends the CRM update request.\n\n### Required setup\n- Install the `n8n-nodes-visisign` community node.\n- Add VisiSign API credentials.\n- Configure your CRM automation to send the fields listed in the payload note.\n- Set `crm_update_url` and `crm_authorization_header` from your CRM automation or replace the HTTP node with your CRM native n8n node.\n\n### Sample test payload\n```json\n{\n  \"deal_id\": \"deal_1042\",\n  \"deal_name\": \"Westholme Park Lease\",\n  \"contact_name\": \"Penelope Kaster\",\n  \"contact_email\": \"pennykaster@example.com\",\n  \"contract_url\": \"https://api.visisign.app/samples/visisign-test-agreement.pdf\",\n  \"crm_update_url\": \"https://httpbin.org/patch\",\n  \"crm_authorization_header\": \"Bearer test-token\",\n  \"sales_notification_email\": \"sales@example.com\",\n  \"sender_email\": \"contracts@example.com\"\n}\n```",
         "height": 560,
         "width": 420,
         "color": 1
       },
       "id": "a1000000-0000-4000-8000-000000000000",
-      "name": "Sticky Note",
+      "name": "Overview and setup",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-200, 80]
+      "position": [
+        -200,
+        80
+      ]
     },
     {
       "parameters": {
-        "content": "### 1. Trigger\nCRM sends a webhook when a deal is closed-won.\n\nConfigure your CRM to POST deal data including:\n- `contact_name`\n- `contact_email`\n- `deal_name`\n- `contract_url` (link to your PDF)",
+        "content": "### Incoming deal payload\n\nThe webhook expects a closed-won deal payload with contact, contract, and CRM callback fields. Use the sample payload in the overview note for a test run.\n\nFor production, map these fields from HubSpot, Pipedrive, Salesforce, or your CRM webhook builder.",
         "height": 200,
         "width": 260,
         "color": 7
       },
       "id": "a1000000-0000-4000-8000-000000000010",
-      "name": "Sticky Note1",
+      "name": "Deal webhook payload",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [260, 140]
+      "position": [
+        260,
+        140
+      ]
     },
     {
       "parameters": {
-        "content": "### 2. Send contract\nVisiSign creates a signature request with the contact's name, email, and the contract PDF.",
+        "content": "### Create the contract request\n\nThe VisiSign node uses the incoming `contract_url`, `contact_name`, and `contact_email`. The VisiSign sample PDF URL is public so the workflow can be tested before you connect real contract generation.",
         "height": 140,
         "width": 260,
         "color": 7
       },
       "id": "a1000000-0000-4000-8000-000000000011",
-      "name": "Sticky Note2",
+      "name": "Create signature request",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [540, 140]
+      "position": [
+        540,
+        140
+      ]
     },
     {
       "parameters": {
-        "content": "### 3. Wait for completion\nVisiSign Trigger fires when all signers have completed. The workflow then updates your CRM and notifies the team.",
+        "content": "### Completion event\n\nWhen all signers complete, VisiSign calls this trigger. The HTTP node posts the signed status to the CRM update URL supplied by the incoming deal payload.",
         "height": 140,
         "width": 520,
         "color": 7
       },
       "id": "a1000000-0000-4000-8000-000000000012",
-      "name": "Sticky Note3",
+      "name": "Completion follow-up",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [260, 400]
+      "position": [
+        260,
+        400
+      ]
     },
     {
       "parameters": {
@@ -65,7 +77,10 @@
       "name": "Deal Closed Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [300, 360],
+      "position": [
+        300,
+        360
+      ],
       "webhookId": "deal-closed"
     },
     {
@@ -82,13 +97,17 @@
             }
           ]
         },
-        "message": "={{ 'Hi ' + $json.contact_name + ',\\n\\nPlease review and sign the contract for ' + $json.deal_name + '.\\n\\nLet us know if you have any questions.' }}"
+        "message": "={{ 'Hi ' + $json.contact_name + ',\\n\\nPlease review and sign the contract for ' + $json.deal_name + '.\\n\\nLet us know if you have any questions.' }}",
+        "metadata": "={{ { deal_id: $json.deal_id, crm_update_url: $json.crm_update_url, crm_authorization_header: $json.crm_authorization_header, sales_notification_email: $json.sales_notification_email, sender_email: $json.sender_email } }}"
       },
       "id": "a1b2c3d4-0002-4000-8000-000000000002",
       "name": "Send Contract via VisiSign",
       "type": "n8n-nodes-visisign.visiSign",
       "typeVersion": 1,
-      "position": [560, 360],
+      "position": [
+        560,
+        360
+      ],
       "credentials": {
         "visiSignApi": {
           "id": "1",
@@ -98,13 +117,16 @@
     },
     {
       "parameters": {
-        "events": ["signature_request.completed"]
+        "event": "signature_request.completed"
       },
       "id": "a1b2c3d4-0003-4000-8000-000000000003",
       "name": "Contract Completed Trigger",
       "type": "n8n-nodes-visisign.visiSignTrigger",
       "typeVersion": 1,
-      "position": [300, 560],
+      "position": [
+        300,
+        560
+      ],
       "webhookId": "visisign-completed",
       "credentials": {
         "visiSignApi": {
@@ -116,13 +138,13 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "=https://api.your-crm.com/deals/{{ $json.signature_request.metadata.deal_id }}",
+        "url": "={{ $json.signature_request.metadata.crm_update_url || \"https://httpbin.org/patch\" }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "Authorization",
-              "value": "Bearer {{ $credentials.crmApiKey }}"
+              "value": "={{ $json.signature_request.metadata.crm_authorization_header || \"Bearer test-token\" }}"
             }
           ]
         },
@@ -130,8 +152,16 @@
         "bodyParameters": {
           "parameters": [
             {
+              "name": "deal_id",
+              "value": "={{ $json.signature_request.metadata.deal_id }}"
+            },
+            {
               "name": "status",
               "value": "contract_signed"
+            },
+            {
+              "name": "signature_request_id",
+              "value": "={{ $json.signature_request.id }}"
             },
             {
               "name": "signed_at",
@@ -145,12 +175,15 @@
       "name": "Update CRM Deal Status",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [560, 560]
+      "position": [
+        560,
+        560
+      ]
     },
     {
       "parameters": {
-        "fromEmail": "team@yourcompany.com",
-        "toEmail": "sales-team@yourcompany.com",
+        "fromEmail": "={{ $json.signature_request.metadata.sender_email || \"contracts@example.com\" }}",
+        "toEmail": "={{ $json.signature_request.metadata.sales_notification_email || \"sales@example.com\" }}",
         "subject": "={{ 'Contract signed: ' + $('Contract Completed Trigger').item.json.signature_request.title }}",
         "emailType": "text",
         "message": "={{ $('Contract Completed Trigger').item.json.signature_request.title + ' has been fully signed by all parties.' }}"
@@ -159,7 +192,10 @@
       "name": "Notify Sales Team",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [780, 560]
+      "position": [
+        780,
+        560
+      ]
     }
   ],
   "connections": {

@@ -3,55 +3,67 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Send service agreements after Stripe payment\n\nThis workflow sends a service agreement for e-signature via [VisiSign](https://visisign.app) after a Stripe checkout completes, then provisions the customer's account once they sign.\n\n**Who is this for?**\nSaaS companies, agencies, and service providers who need a signed agreement before activating a customer's account or delivering services.\n\n**How it works**\n1. Stripe sends a `checkout.session.completed` webhook after payment\n2. VisiSign sends the service agreement to the customer\n3. When the customer signs, VisiSign fires a completion webhook\n4. The workflow provisions the account and sends a welcome email\n5. The signed PDF is downloaded and archived to S3\n\n**Requirements**\n- [VisiSign account](https://app.visisign.app/signup) with an API key\n- Stripe account with checkout enabled\n- The `n8n-nodes-visisign` community node installed (self-hosted n8n only)\n\n**How to set up**\n1. Install the community node: Settings → Community Nodes → `n8n-nodes-visisign`\n2. Add your VisiSign API key as credentials\n3. In Stripe → Developers → Webhooks, add the webhook URL and select `checkout.session.completed`\n4. Replace the agreement PDF URL with your own\n5. Update the provisioning endpoint with your app's API\n6. Activate the workflow",
+        "content": "## Send service agreements after Stripe payment\n\nThis workflow listens for Stripe `checkout.session.completed`, sends a service agreement through VisiSign, provisions the customer after signing, and archives the signed PDF.\n\n### Tested path\n1. Send the sample Stripe-style payload below to the **Stripe Checkout Webhook** test URL.\n2. Confirm the IF node allows only `checkout.session.completed`.\n3. Confirm **Send Agreement via VisiSign** creates a signature request.\n4. Complete the request in VisiSign and confirm the completion branch runs.\n\n### Required setup\n- Install `n8n-nodes-visisign`.\n- Add VisiSign API credentials.\n- Add SMTP/email credentials.\n- In Stripe, subscribe this webhook to `checkout.session.completed`.\n- Store the agreement PDF URL and provisioning/archive URLs in Stripe Checkout Session metadata.\n\n### Sample test payload\n```json\n{\n  \"type\": \"checkout.session.completed\",\n  \"data\": {\n    \"object\": {\n      \"id\": \"cs_test_1042\",\n      \"customer_details\": {\n        \"name\": \"Robert ONeill\",\n        \"email\": \"leasing@example.com\"\n      },\n      \"metadata\": {\n        \"agreement_pdf_url\": \"https://api.visisign.app/samples/visisign-test-agreement.pdf\",\n        \"provision_url\": \"https://httpbin.org/post\",\n        \"archive_upload_url\": \"https://httpbin.org/put\",\n        \"sender_email\": \"welcome@example.com\"\n      }\n    }\n  }\n}\n```",
         "height": 640,
         "width": 420,
         "color": 1
       },
       "id": "c1000000-0000-4000-8000-000000000000",
-      "name": "Sticky Note",
+      "name": "Overview and setup",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-200, 80]
+      "position": [
+        -200,
+        80
+      ]
     },
     {
       "parameters": {
-        "content": "### 1. Payment → send agreement\nStripe checkout completes → verify event type → VisiSign sends agreement to the customer.",
+        "content": "### Stripe checkout event\n\nThe IF node blocks non-completion Stripe events. For production, configure Stripe to send only `checkout.session.completed` to this webhook.",
         "height": 120,
         "width": 520,
         "color": 7
       },
       "id": "c1000000-0000-4000-8000-000000000010",
-      "name": "Sticky Note1",
+      "name": "Stripe checkout event",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [260, 100]
+      "position": [
+        260,
+        100
+      ]
     },
     {
       "parameters": {
-        "content": "### 2. Signed → provision + welcome\nAgreement signed → provision account → send welcome email.",
+        "content": "### Provision customer\n\nAfter the agreement is signed, post the signer and signature request IDs to your provisioning endpoint. The sample payload uses `https://httpbin.org/post` for test execution.",
         "height": 120,
         "width": 300,
         "color": 7
       },
       "id": "c1000000-0000-4000-8000-000000000011",
-      "name": "Sticky Note2",
+      "name": "Provision customer",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [260, 400]
+      "position": [
+        260,
+        400
+      ]
     },
     {
       "parameters": {
-        "content": "### 3. Archive signed PDF\nDownload the signed agreement and store it in S3 or your preferred storage.",
+        "content": "### Archive PDF\n\nThe completed PDF is downloaded from VisiSign and PUT to the archive upload URL from Stripe metadata. Replace this with your storage provider native n8n node if preferred.",
         "height": 120,
         "width": 300,
         "color": 7
       },
       "id": "c1000000-0000-4000-8000-000000000012",
-      "name": "Sticky Note3",
+      "name": "Archive signed agreement",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [260, 620]
+      "position": [
+        260,
+        620
+      ]
     },
     {
       "parameters": {
@@ -65,7 +77,10 @@
       "name": "Stripe Checkout Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [300, 240],
+      "position": [
+        300,
+        240
+      ],
       "webhookId": "stripe-payment"
     },
     {
@@ -95,14 +110,17 @@
       "name": "Verify Stripe Event",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [540, 240]
+      "position": [
+        540,
+        240
+      ]
     },
     {
       "parameters": {
         "resource": "signatureRequest",
         "operation": "create",
         "title": "={{ 'Service Agreement — ' + $('Stripe Checkout Webhook').item.json.data.object.customer_details.name }}",
-        "fileUrl": "https://your-storage.com/templates/service-agreement.pdf",
+        "fileUrl": "={{ $(\"Stripe Checkout Webhook\").item.json.data.object.metadata.agreement_pdf_url }}",
         "signers": {
           "signer": [
             {
@@ -111,13 +129,17 @@
             }
           ]
         },
-        "message": "={{ 'Hi ' + $('Stripe Checkout Webhook').item.json.data.object.customer_details.name + ',\\n\\nThank you for your purchase! Please review and sign the service agreement to activate your account.' }}"
+        "message": "={{ 'Hi ' + $('Stripe Checkout Webhook').item.json.data.object.customer_details.name + ',\\n\\nThank you for your purchase! Please review and sign the service agreement to activate your account.' }}",
+        "metadata": "={{ { provision_url: $(\"Stripe Checkout Webhook\").item.json.data.object.metadata.provision_url, archive_upload_url: $(\"Stripe Checkout Webhook\").item.json.data.object.metadata.archive_upload_url, authorization_header: $(\"Stripe Checkout Webhook\").item.json.data.object.metadata.authorization_header, sender_email: $(\"Stripe Checkout Webhook\").item.json.data.object.metadata.sender_email, login_url: $(\"Stripe Checkout Webhook\").item.json.data.object.metadata.login_url } }}"
       },
       "id": "c1b2c3d4-0003-4000-8000-000000000003",
       "name": "Send Agreement via VisiSign",
       "type": "n8n-nodes-visisign.visiSign",
       "typeVersion": 1,
-      "position": [780, 240],
+      "position": [
+        780,
+        240
+      ],
       "credentials": {
         "visiSignApi": {
           "id": "1",
@@ -127,13 +149,16 @@
     },
     {
       "parameters": {
-        "events": ["signature_request.completed"]
+        "event": "signature_request.completed"
       },
       "id": "c1b2c3d4-0004-4000-8000-000000000004",
       "name": "Agreement Signed Trigger",
       "type": "n8n-nodes-visisign.visiSignTrigger",
       "typeVersion": 1,
-      "position": [300, 540],
+      "position": [
+        300,
+        540
+      ],
       "webhookId": "visisign-agreement-done",
       "credentials": {
         "visiSignApi": {
@@ -145,13 +170,13 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.your-app.com/accounts/provision",
+        "url": "={{ $json.signature_request.metadata.provision_url || \"https://httpbin.org/post\" }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "Authorization",
-              "value": "Bearer {{ $credentials.appApiKey }}"
+              "value": "={{ $json.signature_request.metadata.authorization_header || \"Bearer test-token\" }}"
             }
           ]
         },
@@ -178,21 +203,27 @@
       "name": "Provision Customer Account",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [540, 540]
+      "position": [
+        540,
+        540
+      ]
     },
     {
       "parameters": {
-        "fromEmail": "welcome@yourcompany.com",
+        "fromEmail": "={{ $(\"Agreement Signed Trigger\").item.json.signature_request.metadata.sender_email || \"welcome@example.com\" }}",
         "toEmail": "={{ $('Agreement Signed Trigger').item.json.signature_request.signers[0].email }}",
         "subject": "Your account is ready",
         "emailType": "text",
-        "message": "={{ 'Hi ' + $('Agreement Signed Trigger').item.json.signature_request.signers[0].name + ',\\n\\nYour agreement has been signed and your account is now active.\\n\\nLog in at: https://app.yourcompany.com\\n\\nWelcome aboard!' }}"
+        "message": "={{ \"Hi \" + $(\"Agreement Signed Trigger\").item.json.signature_request.signers[0].name + \",\\n\\nYour agreement has been signed and your account is now active.\" + ($(\"Agreement Signed Trigger\").item.json.signature_request.metadata.login_url ? \"\\n\\nLog in at: \" + $(\"Agreement Signed Trigger\").item.json.signature_request.metadata.login_url : \"\") + \"\\n\\nWelcome aboard!\" }}"
       },
       "id": "c1b2c3d4-0006-4000-8000-000000000006",
       "name": "Send Welcome Email",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [780, 540]
+      "position": [
+        780,
+        540
+      ]
     },
     {
       "parameters": {
@@ -204,7 +235,10 @@
       "name": "Download Signed Agreement",
       "type": "n8n-nodes-visisign.visiSign",
       "typeVersion": 1,
-      "position": [540, 760],
+      "position": [
+        540,
+        760
+      ],
       "credentials": {
         "visiSignApi": {
           "id": "1",
@@ -215,7 +249,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "=https://your-storage.com/signed-agreements/{{ $('Agreement Signed Trigger').item.json.signature_request.id }}.pdf",
+        "url": "={{ $(\"Agreement Signed Trigger\").item.json.signature_request.metadata.archive_upload_url || \"https://httpbin.org/put\" }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -230,10 +264,13 @@
         "options": {}
       },
       "id": "c1b2c3d4-0008-4000-8000-000000000008",
-      "name": "Archive to S3",
+      "name": "Archive Signed Agreement",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [780, 760]
+      "position": [
+        780,
+        760
+      ]
     }
   ],
   "connections": {
@@ -290,7 +327,7 @@
       "main": [
         [
           {
-            "node": "Archive to S3",
+            "node": "Archive Signed Agreement",
             "type": "main",
             "index": 0
           }

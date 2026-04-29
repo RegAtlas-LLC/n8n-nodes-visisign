@@ -21,6 +21,12 @@ You need a VisiSign API key to use this node.
 3. Create a new API key
 4. In n8n, create new **VisiSign API** credentials and paste your key
 
+The default API base URL is `https://api.visisign.app`.
+
+For first-run testing, use this public PDF URL in the **File URL** field:
+
+`https://api.visisign.app/samples/visisign-test-agreement.pdf`
+
 ## Nodes
 
 ### VisiSign

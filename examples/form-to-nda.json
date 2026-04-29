@@ -3,42 +3,51 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Automatically send NDAs from form submissions\n\nThis workflow sends an NDA for e-signature via [VisiSign](https://visisign.app) whenever someone submits a form, then emails them the signed copy once they complete it.\n\n**Who is this for?**\nTeams that need NDAs signed before sharing confidential info — common in consulting, hiring, partnerships, and vendor onboarding.\n\n**How it works**\n1. A form submission triggers the workflow via webhook\n2. VisiSign sends the NDA to the submitter for signing\n3. The form gets an immediate confirmation response\n4. When the NDA is signed, VisiSign fires a webhook\n5. The signed PDF is downloaded and emailed back to the signer\n6. Optionally, a Slack notification is sent\n\n**Requirements**\n- [VisiSign account](https://app.visisign.app/signup) with an API key\n- A form tool (Typeform, Tally, Webflow, or any tool with webhook support)\n- The `n8n-nodes-visisign` community node installed (self-hosted n8n only)\n\n**How to set up**\n1. Install the community node: Settings → Community Nodes → `n8n-nodes-visisign`\n2. Add your VisiSign API key as credentials\n3. Replace the NDA PDF URL with your own template\n4. Point your form's webhook to the n8n webhook URL\n5. Activate the workflow",
+        "content": "## Automatically send NDAs from form submissions\n\nThis workflow sends an NDA through VisiSign after a form submission, replies to the form immediately, and emails the signed PDF back when VisiSign reports completion.\n\n### Tested path\n1. Send the sample form payload below to the **Form Submitted** test URL.\n2. Confirm **Send NDA via VisiSign** creates a signature request.\n3. Complete the signature request in VisiSign.\n4. Confirm the trigger downloads the signed file and passes it to the email node.\n\n### Required setup\n- Install `n8n-nodes-visisign`.\n- Add VisiSign API credentials.\n- Add SMTP/email credentials for the email node.\n- Configure your form tool to send `name`, `email`, and `nda_pdf_url`.\n\n### Sample test payload\n```json\n{\n  \"name\": \"Abigail Kaster\",\n  \"email\": \"abbykaster@example.com\",\n  \"nda_pdf_url\": \"https://api.visisign.app/samples/visisign-test-agreement.pdf\",\n  \"sender_email\": \"legal@example.com\"\n}\n```",
         "height": 600,
         "width": 420,
         "color": 1
       },
       "id": "b1000000-0000-4000-8000-000000000000",
-      "name": "Sticky Note",
+      "name": "Overview and setup",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-200, 80]
+      "position": [
+        -200,
+        80
+      ]
     },
     {
       "parameters": {
-        "content": "### 1. Form triggers NDA\nForm submits name + email → VisiSign sends NDA → form gets a confirmation response.",
+        "content": "### Form submission\n\nConnect Typeform, Tally, Webflow, or any form tool that can POST JSON to this webhook. The workflow only needs the signer name, signer email, and a PDF URL for the NDA.",
         "height": 120,
         "width": 520,
         "color": 7
       },
       "id": "b1000000-0000-4000-8000-000000000010",
-      "name": "Sticky Note1",
+      "name": "Form submission payload",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [260, 140]
+      "position": [
+        260,
+        140
+      ]
     },
     {
       "parameters": {
-        "content": "### 2. Signed → download + notify\nWhen the signer completes, download the signed PDF and email it back to them. Optionally notify Slack.",
+        "content": "### Signed copy\n\nThe VisiSign completion trigger downloads the completed PDF and attaches it to the email sent back to the signer.",
         "height": 120,
         "width": 520,
         "color": 7
       },
       "id": "b1000000-0000-4000-8000-000000000011",
-      "name": "Sticky Note2",
+      "name": "Signed NDA delivery",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [260, 400]
+      "position": [
+        260,
+        400
+      ]
     },
     {
       "parameters": {
@@ -51,7 +60,10 @@
       "name": "Form Submitted",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [300, 280],
+      "position": [
+        300,
+        280
+      ],
       "webhookId": "nda-request"
     },
     {
@@ -59,7 +71,7 @@
         "resource": "signatureRequest",
         "operation": "create",
         "title": "={{ 'Non-Disclosure Agreement — ' + $json.name }}",
-        "fileUrl": "https://your-storage.com/templates/nda-template.pdf",
+        "fileUrl": "={{ $json.nda_pdf_url }}",
         "signers": {
           "signer": [
             {
@@ -68,13 +80,17 @@
             }
           ]
         },
-        "message": "={{ 'Hi ' + $json.name + ',\\n\\nPlease review and sign the NDA to proceed. This should only take a minute.' }}"
+        "message": "={{ 'Hi ' + $json.name + ',\\n\\nPlease review and sign the NDA to proceed. This should only take a minute.' }}",
+        "metadata": "={{ { sender_email: $json.sender_email } }}"
       },
       "id": "b1b2c3d4-0002-4000-8000-000000000002",
       "name": "Send NDA via VisiSign",
       "type": "n8n-nodes-visisign.visiSign",
       "typeVersion": 1,
-      "position": [540, 280],
+      "position": [
+        540,
+        280
+      ],
       "credentials": {
         "visiSignApi": {
           "id": "1",
@@ -91,17 +107,23 @@
       "name": "Respond to Form",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [780, 280]
+      "position": [
+        780,
+        280
+      ]
     },
     {
       "parameters": {
-        "events": ["signature_request.completed"]
+        "event": "signature_request.completed"
       },
       "id": "b1b2c3d4-0004-4000-8000-000000000004",
       "name": "NDA Signed Trigger",
       "type": "n8n-nodes-visisign.visiSignTrigger",
       "typeVersion": 1,
-      "position": [300, 540],
+      "position": [
+        300,
+        540
+      ],
       "webhookId": "visisign-signed",
       "credentials": {
         "visiSignApi": {
@@ -120,7 +142,10 @@
       "name": "Download Signed NDA",
       "type": "n8n-nodes-visisign.visiSign",
       "typeVersion": 1,
-      "position": [540, 540],
+      "position": [
+        540,
+        540
+      ],
       "credentials": {
         "visiSignApi": {
           "id": "1",
@@ -130,7 +155,7 @@
     },
     {
       "parameters": {
-        "fromEmail": "noreply@yourcompany.com",
+        "fromEmail": "={{ $(\"NDA Signed Trigger\").item.json.signature_request.metadata.sender_email || \"legal@example.com\" }}",
         "toEmail": "={{ $('NDA Signed Trigger').item.json.signature_request.signers[0].email }}",
         "subject": "Your signed NDA is attached",
         "emailType": "text",
@@ -143,28 +168,10 @@
       "name": "Email Signed Copy to Signer",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [780, 540]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "text",
-              "value": "={{ $('NDA Signed Trigger').item.json.signature_request.signers[0].name + ' signed the NDA: ' + $('NDA Signed Trigger').item.json.signature_request.title }}"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "b1b2c3d4-0007-4000-8000-000000000007",
-      "name": "Notify Slack (Optional)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [780, 720]
+      "position": [
+        780,
+        540
+      ]
     }
   ],
   "connections": {
@@ -206,11 +213,6 @@
         [
           {
             "node": "Email Signed Copy to Signer",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Notify Slack (Optional)",
             "type": "main",
             "index": 0
           }

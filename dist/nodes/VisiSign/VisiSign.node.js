@@ -280,6 +280,26 @@ class VisiSign {
                         },
                     },
                 },
+                // Metadata (for create)
+                {
+                    displayName: 'Metadata',
+                    name: 'metadata',
+                    type: 'json',
+                    default: '{}',
+                    displayOptions: {
+                        show: {
+                            resource: ['signatureRequest'],
+                            operation: ['create'],
+                        },
+                    },
+                    description: 'Optional JSON metadata returned in API responses and webhooks',
+                    routing: {
+                        send: {
+                            type: 'body',
+                            property: 'metadata',
+                        },
+                    },
+                },
                 // Email for remind
                 {
                     displayName: 'Signer Email',
